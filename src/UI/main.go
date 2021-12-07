@@ -26,11 +26,11 @@ func main() {
 			DriverMain.Hello()
 		} else if CreateAccMenuOption == 2 {
 			DriverMain.Hello()
-			jsonData := map[string]string{"ID": "t1212213o", "First Name": "Gerald", "Last Name": "Tan",
-				"Mobile No": "91234567", "Email Address": "Testing@test.com", "License No": "LKS123L", "Status": "Available"}
+			jsonData := map[string]interface{}{"IC No": "T01212193L", "First Name": "Gerald", "Last Name": "Tan",
+				"Mobile No": 91234567, "Email Address": "Testing@test.com", "License No": "LKS123L", "Status": "Available"}
 			DriverMain.AddDriver("1", jsonData)
 			DriverMain.GetDriver("1")
-			DriverMain.AddDriverToDB()
+			DriverMain.AddDriverToDB(jsonData)
 		}
 	}
 }
