@@ -15,6 +15,7 @@ type Driver struct { // map this type to the record in the table
 	EmailAddress string
 	LicenseNo    string
 	Status       string
+	ICNo         string
 }
 
 func EditRecord(db *sql.DB, ID int, FN string, LN string, MN int, EA string, LiN string) {
@@ -38,9 +39,10 @@ func UpdateStatus(db *sql.DB, ID int, S string) {
 	}
 }
 
-func InsertRecord(db *sql.DB, ID int, FN string, LN string, MN int, EA string, LiN string) {
-	query := fmt.Sprintf("INSERT INTO Driver VALUES (%d, '%s', '%s', %d,'%s','%s')",
-		ID, FN, LN, MN, EA, LiN)
+func InsertRecord(db *sql.DB, FN string, LN string, MN int, EA string, LiN string, S string, IC string) {
+	query := fmt.Sprintf("INSERT INTO Drivers (FirstName, LastName, MobileNo, EmailAddress, LicenseNo, Status,ICNo) VALUES ( '%s', '%s', %d,'%s','%s','%s','%s')",
+		FN, LN, MN, EA, LiN, S, IC)
+	fmt.Println("qeury", query)
 	_, err := db.Query(query)
 
 	if err != nil {
@@ -49,7 +51,7 @@ func InsertRecord(db *sql.DB, ID int, FN string, LN string, MN int, EA string, L
 }
 
 func GetRecords(db *sql.DB) {
-	results, err := db.Query("Select * FROM ride_sharing.Driver")
+	results, err := db.Query("Select * FROM ride_sharing.Drivers")
 
 	if err != nil {
 		panic(err.Error())
@@ -59,16 +61,16 @@ func GetRecords(db *sql.DB) {
 		// map this type to the record in the table
 		var driver Driver
 		err = results.Scan(&driver.DriverID, &driver.FirstName, &driver.LastName,
-			&driver.MobileNo, &driver.EmailAddress, &driver.LicenseNo)
+			&driver.MobileNo, &driver.EmailAddress, &driver.LicenseNo, &driver.Status, &driver.ICNo)
 		if err != nil {
 			panic(err.Error())
 		}
 		fmt.Println(driver.DriverID, driver.FirstName, driver.LastName,
-			driver.MobileNo, driver.EmailAddress, driver.LicenseNo)
+			driver.MobileNo, driver.EmailAddress, driver.LicenseNo, driver.Status, driver.ICNo)
 	}
 }
 
-func DriverDB() {
+func DriverDB(method string, driver Driver) {
 	// Use mysql as driverName and a valid DSN as dataSourceName:
 	db, err := sql.Open("mysql", "user:password@tcp(127.0.0.1:3306)/ride_sharing")
 
@@ -76,14 +78,15 @@ func DriverDB() {
 	if err != nil {
 		panic(err.Error())
 	}
-	// InsertRecord(db, 2, "Wallace", "Tan", 55)
-	// EditRecord(db, 2, "Taylor", "Swift", 23)
+	if method == "Insert" {
+		fmt.Println(driver.FirstName)
+		InsertRecord(db, driver.FirstName, driver.LastName, driver.MobileNo, driver.EmailAddress, driver.LicenseNo, driver.Status, driver.ICNo)
+	}
 
 	GetRecords(db)
 
 	// defer the close till after the main function has finished executing
 	defer db.Close()
-
 	fmt.Println("Database opened")
 
 }

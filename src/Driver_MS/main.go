@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	DriverDB "importMods/Driver_MS/Database"
 	"io/ioutil"
 	"net/http"
 )
@@ -11,7 +12,7 @@ import (
 const baseURL = "http://localhost:1000/api/v1/drivers"
 const key = "2c78afaf-97da-4816-bbee-9ad239abb296"
 
-func getDriver(code string) {
+func GetDriver(code string) {
 	url := baseURL
 	if code != "" {
 		url = baseURL + "/" + code + "?key=" + key
@@ -28,7 +29,7 @@ func getDriver(code string) {
 	}
 }
 
-func addDriver(code string, jsonData map[string]string) {
+func AddDriver(code string, jsonData map[string]interface{}) {
 	jsonValue, _ := json.Marshal(jsonData)
 
 	response, err := http.Post(baseURL+"/"+code+"?key="+key,
@@ -44,7 +45,7 @@ func addDriver(code string, jsonData map[string]string) {
 	}
 }
 
-func updateDriver(code string, jsonData map[string]string) {
+func UpdateDriver(code string, jsonData map[string]string) {
 	jsonValue, _ := json.Marshal(jsonData)
 
 	request, err := http.NewRequest(http.MethodPut,
@@ -66,7 +67,7 @@ func updateDriver(code string, jsonData map[string]string) {
 	}
 }
 
-func deleteDriver(code string) {
+func DeleteDriver(code string) {
 
 	request, err := http.NewRequest(http.MethodDelete,
 		baseURL+"/"+code+"?key="+key, nil)
@@ -83,10 +84,35 @@ func deleteDriver(code string) {
 		response.Body.Close()
 	}
 }
-func hello() {
-
+func Hello() {
 	fmt.Println("SADLKS")
 }
-func DriverMain() {
 
+// DB Functions
+type Driver struct { // map this type to the record in the table
+	DriverID     int
+	FirstName    string
+	LastName     string
+	MobileNo     int
+	EmailAddress string
+	LicenseNo    string
+	Status       string
+	ICNo         string
+}
+
+func GetAllDriver() {
+	// DriverDB.GetRecords()
+}
+
+func AddDriverToDB(jsonData map[string]interface{}) {
+	var driver Driver
+	driver.DriverID = 0
+	driver.FirstName = jsonData["First Name"].(string)
+	driver.LastName = jsonData["Last Name"].(string)
+	driver.ICNo = jsonData["IC No"].(string)
+	driver.MobileNo = jsonData["Mobile No"].(int)
+	driver.LicenseNo = jsonData["License No"].(string)
+	driver.Status = jsonData["Status"].(string)
+	driver.EmailAddress = jsonData["Email Address"].(string)
+	DriverDB.DriverDB("Insert", DriverDB.Driver(driver))
 }

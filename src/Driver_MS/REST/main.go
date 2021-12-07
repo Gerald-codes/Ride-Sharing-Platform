@@ -1,4 +1,4 @@
-package REST
+package main
 
 import (
 	"encoding/json"
@@ -179,7 +179,7 @@ func driver(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func REST() {
+func main() {
 
 	// instantiate courses
 	drivers = make(map[string]driverInfo)
