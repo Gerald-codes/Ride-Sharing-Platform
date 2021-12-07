@@ -70,6 +70,27 @@ func GetRecords(db *sql.DB) {
 	}
 }
 
+func GetSpecRecord(db *sql.DB, IC string) {
+	results, err := db.Query("Select * FROM ride_sharing.Drivers WHERE ICNo ='%s'", IC)
+
+	if err != nil {
+		panic(err.Error())
+	}
+
+	for results.Next() {
+		// map this type to the record in the table
+		var driver Driver
+		err = results.Scan(&driver.DriverID, &driver.FirstName, &driver.LastName,
+			&driver.MobileNo, &driver.EmailAddress, &driver.LicenseNo, &driver.Status, &driver.ICNo)
+		if err != nil {
+			panic(err.Error())
+		}
+
+		fmt.Println(driver.DriverID, driver.FirstName, driver.LastName,
+			driver.MobileNo, driver.EmailAddress, driver.LicenseNo, driver.Status, driver.ICNo)
+	}
+}
+
 func DriverDB(method string, driver Driver) {
 	// Use mysql as driverName and a valid DSN as dataSourceName:
 	db, err := sql.Open("mysql", "user:password@tcp(127.0.0.1:3306)/ride_sharing")

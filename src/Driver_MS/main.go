@@ -45,7 +45,7 @@ func AddDriver(code string, jsonData map[string]interface{}) {
 	}
 }
 
-func UpdateDriver(code string, jsonData map[string]string) {
+func UpdateDriver(code string, jsonData map[string]interface{}) {
 	jsonValue, _ := json.Marshal(jsonData)
 
 	request, err := http.NewRequest(http.MethodPut,
@@ -84,9 +84,6 @@ func DeleteDriver(code string) {
 		response.Body.Close()
 	}
 }
-func Hello() {
-	fmt.Println("SADLKS")
-}
 
 // DB Functions
 type Driver struct { // map this type to the record in the table
@@ -101,6 +98,9 @@ type Driver struct { // map this type to the record in the table
 }
 
 func GetAllDriver() {
+	// DriverDB.GetRecords()
+}
+func GetSpecDriver() {
 	// DriverDB.GetRecords()
 }
 
