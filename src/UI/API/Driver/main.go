@@ -1,10 +1,9 @@
-package DriverMain
+package DriverAPI
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	DriverDB "importMods/Driver_MS/Database"
 	"io/ioutil"
 	"net/http"
 )
@@ -12,10 +11,28 @@ import (
 const baseURL = "http://localhost:1000/api/v1/drivers"
 const key = "2c78afaf-97da-4816-bbee-9ad239abb296"
 
+// Driver API Functions
 func GetDriver(code string) {
 	url := baseURL
 	if code != "" {
 		url = baseURL + "/" + code + "?key=" + key
+	}
+	response, err := http.Get(url)
+
+	if err != nil {
+		fmt.Printf("The HTTP request failed with error %s\n", err)
+	} else {
+		data, _ := ioutil.ReadAll(response.Body)
+		fmt.Println(response.StatusCode)
+		fmt.Println(string(data))
+		response.Body.Close()
+	}
+}
+
+func GetAllDriver(code string) {
+	url := baseURL
+	if code != "" {
+		url = baseURL
 	}
 	response, err := http.Get(url)
 
@@ -34,7 +51,8 @@ func AddDriver(code string, jsonData map[string]interface{}) {
 
 	response, err := http.Post(baseURL+"/"+code+"?key="+key,
 		"application/json", bytes.NewBuffer(jsonValue))
-
+	fmt.Println("\nAdd Driver Api called")
+	fmt.Println("TEST", bytes.NewBuffer(jsonValue))
 	if err != nil {
 		fmt.Printf("The HTTP request failed with error %s\n", err)
 	} else {
@@ -48,14 +66,19 @@ func AddDriver(code string, jsonData map[string]interface{}) {
 func UpdateDriver(code string, jsonData map[string]interface{}) {
 	jsonValue, _ := json.Marshal(jsonData)
 
-	request, err := http.NewRequest(http.MethodPut,
+	request, NRerr := http.NewRequest(http.MethodPut,
 		baseURL+"/"+code+"?key="+key,
 		bytes.NewBuffer(jsonValue))
+
+	if NRerr != nil {
+		fmt.Printf("New request failed with error %s\n", NRerr)
+	}
 
 	request.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	response, err := client.Do(request)
+	fmt.Println("\nUpdate Driver Api called")
 
 	if err != nil {
 		fmt.Printf("The HTTP request failed with error %s\n", err)
@@ -69,8 +92,12 @@ func UpdateDriver(code string, jsonData map[string]interface{}) {
 
 func DeleteDriver(code string) {
 
-	request, err := http.NewRequest(http.MethodDelete,
+	request, NRerr := http.NewRequest(http.MethodDelete,
 		baseURL+"/"+code+"?key="+key, nil)
+
+	if NRerr != nil {
+		fmt.Printf("New request failed with error %s\n", NRerr)
+	}
 
 	client := &http.Client{}
 	response, err := client.Do(request)
@@ -85,34 +112,20 @@ func DeleteDriver(code string) {
 	}
 }
 
-// DB Functions
-type Driver struct { // map this type to the record in the table
-	DriverID     int
-	FirstName    string
-	LastName     string
-	MobileNo     int
-	EmailAddress string
-	LicenseNo    string
-	Status       string
-	ICNo         string
-}
+// Passenger API Functions
+func AddPassenger(code string, jsonData map[string]interface{}) {
+	jsonValue, _ := json.Marshal(jsonData)
 
-func GetAllDriver() {
-	// DriverDB.GetRecords()
-}
-func GetSpecDriver() {
-	// DriverDB.GetRecords()
-}
-
-func AddDriverToDB(jsonData map[string]interface{}) {
-	var driver Driver
-	driver.DriverID = 0
-	driver.FirstName = jsonData["First Name"].(string)
-	driver.LastName = jsonData["Last Name"].(string)
-	driver.ICNo = jsonData["IC No"].(string)
-	driver.MobileNo = jsonData["Mobile No"].(int)
-	driver.LicenseNo = jsonData["License No"].(string)
-	driver.Status = jsonData["Status"].(string)
-	driver.EmailAddress = jsonData["Email Address"].(string)
-	DriverDB.DriverDB("Insert", DriverDB.Driver(driver))
+	response, err := http.Post(baseURL+"/"+code+"?key="+key,
+		"application/json", bytes.NewBuffer(jsonValue))
+	fmt.Println("\nApi called")
+	fmt.Println("TEST", bytes.NewBuffer(jsonValue))
+	if err != nil {
+		fmt.Printf("The HTTP request failed with error %s\n", err)
+	} else {
+		data, _ := ioutil.ReadAll(response.Body)
+		fmt.Println(response.StatusCode)
+		fmt.Println(string(data))
+		response.Body.Close()
+	}
 }

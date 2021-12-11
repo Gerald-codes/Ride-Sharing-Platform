@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	DriverDB "importMods/Driver_MS/Database"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -11,15 +12,16 @@ import (
 )
 
 type driverInfo struct {
-	DriverID     int    `json:"ID"`
+	NRICNo       string `json:"NRIC No"`
 	FirstName    string `json:"First Name"`
 	LastName     string `json:"Last Name"`
 	MobileNo     int    `json:"Mobile No"`
 	EmailAddress string `json:"Email Address"`
 	LicenseNo    string `json:"License No"`
+	Status       string `json:"Status"`
 }
 
-// used for storing courses on the REST API
+// used for storing driver on the REST API
 var drivers map[string]driverInfo
 
 func validKey(r *http.Request) bool {
@@ -48,9 +50,9 @@ func allDrivers(w http.ResponseWriter, r *http.Request) {
 	for k, v := range kv {
 		fmt.Println(k, v) // print out the key/value pair
 	}
-
-	// returns all the courses in JSON
+	// returns all the Drivers in JSON
 	json.NewEncoder(w).Encode(drivers)
+	fmt.Print("\nASDAD")
 
 }
 
@@ -64,9 +66,9 @@ func driver(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 
 	if r.Method == "GET" {
-		if _, ok := drivers[params["driverid"]]; ok {
+		if _, ok := drivers[params["nricno"]]; ok {
 			json.NewEncoder(w).Encode(
-				drivers[params["driverid"]])
+				drivers[params["nricno"]])
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte("404 - No driver found" + "\n"))
@@ -74,11 +76,11 @@ func driver(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "DELETE" {
-		if _, ok := drivers[params["driverid"]]; ok {
-			delete(drivers, params["driverid"])
+		if _, ok := drivers[params["nricno"]]; ok {
+			delete(drivers, params["nricno"])
 			w.WriteHeader(http.StatusAccepted)
 			w.Write([]byte("202 - driver deleted: " +
-				params["driverid"] + "\n"))
+				params["nricno"] + "\n"))
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte("404 - No driver found" + "\n"))
@@ -113,11 +115,12 @@ func driver(w http.ResponseWriter, r *http.Request) {
 				}
 
 				// check if driver exists; add only if driver does not exist
-				if _, ok := drivers[params["driverid"]]; !ok {
-					drivers[params["driverid"]] = newDriver
+				if _, ok := drivers[params["nricno"]]; !ok {
+					drivers[params["nricno"]] = newDriver
+					AddDriverToDB(newDriver)
 					w.WriteHeader(http.StatusCreated)
 					w.Write([]byte("201 - Driver added: " +
-						params["driverid"] + "\n"))
+						params["nricno"] + "\n"))
 				} else {
 					w.WriteHeader(http.StatusConflict)
 					w.Write([]byte(
@@ -153,20 +156,22 @@ func driver(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				// check if course exists; add only if
-				// course does not exist
-				if _, ok := drivers[params["driverid"]]; !ok {
-					drivers[params["driverid"]] =
+				// check if driver exists; add only if
+				// driver does not exist
+				if _, ok := drivers[params["nricno"]]; !ok {
+					drivers[params["nricno"]] =
 						newDriver
+					AddDriverToDB(newDriver)
 					w.WriteHeader(http.StatusCreated)
 					w.Write([]byte("201 - Driver added: " +
-						params["driverid"] + "\n"))
+						params["nricno"] + "\n"))
 				} else {
-					// update course
-					drivers[params["driverid"]] = newDriver
+					// update driver
+					drivers[params["nricno"]] = newDriver
+					UpdateDriverToDB(newDriver)
 					w.WriteHeader(http.StatusAccepted)
 					w.Write([]byte("202 - Driver updated: " +
-						params["driverid"] + "\n"))
+						params["nricno"] + "\n"))
 				}
 			} else {
 				w.WriteHeader(
@@ -179,15 +184,60 @@ func driver(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// DB Functions
+type Driver struct { // map this type to the record in the table
+	DriverID     int
+	FirstName    string
+	LastName     string
+	MobileNo     int
+	EmailAddress string
+	LicenseNo    string
+	Status       string
+	NRICNo       string
+}
+
+func GetAllDriver() {
+	// DriverDB.GetRecords()
+}
+func GetSpecDriver() {
+	// DriverDB.GetRecords()
+}
+
+func AddDriverToDB(driverInfo driverInfo) {
+	fmt.Println("DRIVER: ", driverInfo)
+	var driver Driver
+	driver.FirstName = driverInfo.FirstName
+	driver.LastName = driverInfo.LastName
+	driver.NRICNo = driverInfo.NRICNo
+	driver.MobileNo = driverInfo.MobileNo
+	driver.LicenseNo = driverInfo.LicenseNo
+	driver.Status = driverInfo.Status
+	driver.EmailAddress = driverInfo.EmailAddress
+	DriverDB.DriverDB("Insert", DriverDB.Driver(driver))
+}
+
+func UpdateDriverToDB(driverInfo driverInfo) {
+	fmt.Println("DRIVER: ", driverInfo)
+	var driver Driver
+	driver.FirstName = driverInfo.FirstName
+	driver.LastName = driverInfo.LastName
+	driver.NRICNo = driverInfo.NRICNo
+	driver.MobileNo = driverInfo.MobileNo
+	driver.LicenseNo = driverInfo.LicenseNo
+	driver.Status = driverInfo.Status
+	driver.EmailAddress = driverInfo.EmailAddress
+	DriverDB.DriverDB("Update", DriverDB.Driver(driver))
+}
+
 func main() {
 
-	// instantiate courses
+	// instantiate driver
 	drivers = make(map[string]driverInfo)
 
 	router := mux.NewRouter()
 	router.HandleFunc("/api/v1/", home)
 	router.HandleFunc("/api/v1/drivers", allDrivers)
-	router.HandleFunc("/api/v1/drivers/{driverid}", driver).Methods(
+	router.HandleFunc("/api/v1/drivers/{nricno}", driver).Methods(
 		"GET", "PUT", "POST", "DELETE")
 
 	fmt.Println("Listening at port 1000")

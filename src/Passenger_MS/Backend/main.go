@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	PassengerDB "importMods/Passenger_MS/Database"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -11,13 +12,13 @@ import (
 )
 
 type passengerInfo struct {
-	PassengerID  int    `json:"ID"`
 	FirstName    string `json:"First Name"`
 	LastName     string `json:"Last Name"`
+	MobileNo     int    `json:"Mobile No"`
 	EmailAddress string `json:"Email Address"`
 }
 
-// used for storing courses on the REST API
+// used for storing passengers on the REST API
 var passengers map[string]passengerInfo
 
 func validKey(r *http.Request) bool {
@@ -33,10 +34,6 @@ func validKey(r *http.Request) bool {
 	}
 }
 
-func home(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Welcome to the Passenger REST API!")
-}
-
 func allPassengers(w http.ResponseWriter, r *http.Request) {
 	// fmt.Fprintf(w, "List of all passengers")
 
@@ -47,7 +44,7 @@ func allPassengers(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(k, v) // print out the key/value pair
 	}
 
-	// returns all the courses in JSON
+	// returns all the passengers in JSON
 	json.NewEncoder(w).Encode(passengers)
 
 }
@@ -62,9 +59,9 @@ func passenger(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 
 	if r.Method == "GET" {
-		if _, ok := passengers[params["passengerid"]]; ok {
+		if _, ok := passengers[params["moibleno"]]; ok {
 			json.NewEncoder(w).Encode(
-				passengers[params["passengerid"]])
+				passengers[params["moibleno"]])
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte("404 - No passenger found" + "\n"))
@@ -72,11 +69,11 @@ func passenger(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "DELETE" {
-		if _, ok := passengers[params["passengerid"]]; ok {
-			delete(passengers, params["passengerid"])
+		if _, ok := passengers[params["moibleno"]]; ok {
+			delete(passengers, params["moibleno"])
 			w.WriteHeader(http.StatusAccepted)
-			w.Write([]byte("202 - driver deleted: " +
-				params["passengerid"] + "\n"))
+			w.Write([]byte("202 - passenger deleted: " +
+				params["moibleno"] + "\n"))
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte("404 - No passenger found" + "\n"))
@@ -85,9 +82,8 @@ func passenger(w http.ResponseWriter, r *http.Request) {
 
 	if r.Header.Get("Content-type") == "application/json" {
 
-		// POST is for creating new Driver
+		// POST is for creating new Passenger
 		if r.Method == "POST" {
-
 			// read the string sent to the service
 			var newPassenger passengerInfo
 			reqBody, err := ioutil.ReadAll(r.Body)
@@ -108,12 +104,14 @@ func passenger(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				// check if driver exists; add only if driver does not exist
-				if _, ok := passengers[params["passengerid"]]; !ok {
-					passengers[params["passengerid"]] = newPassenger
+				// check if passenger exists; add only if passenger does not exist
+				if _, ok := passengers[params["moibleno"]]; !ok {
+					passengers[params["moibleno"]] = newPassenger
+					AddPassengerToDB(newPassenger)
 					w.WriteHeader(http.StatusCreated)
 					w.Write([]byte("201 - Passenger added: " +
-						params["passengerid"] + "\n"))
+						params["moibleno"] + "\n"))
+
 				} else {
 					w.WriteHeader(http.StatusConflict)
 					w.Write([]byte(
@@ -128,7 +126,7 @@ func passenger(w http.ResponseWriter, r *http.Request) {
 		}
 
 		//---PUT is for creating or updating
-		// existing driver---
+		// existing passenger---
 		if r.Method == "PUT" {
 			var newPassenger passengerInfo
 			reqBody, err := ioutil.ReadAll(r.Body)
@@ -148,20 +146,22 @@ func passenger(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				// check if course exists; add only if
-				// course does not exist
-				if _, ok := passengers[params["passengerid"]]; !ok {
-					passengers[params["passengerid"]] =
+				// check if Passenger exists; add only if
+				// Passenger does not exist
+				if _, ok := passengers[params["moibleno"]]; !ok {
+					passengers[params["moibleno"]] =
 						newPassenger
+					AddPassengerToDB(newPassenger)
 					w.WriteHeader(http.StatusCreated)
 					w.Write([]byte("201 - Passenger added: " +
-						params["passengerid"] + "\n"))
+						params["moibleno"] + "\n"))
 				} else {
-					// update course
-					passengers[params["passengerid"]] = newPassenger
+					// update Passenger
+					passengers[params["moibleno"]] = newPassenger
+					UpdatePassengerToDB(newPassenger)
 					w.WriteHeader(http.StatusAccepted)
 					w.Write([]byte("202 - Passenger updated: " +
-						params["passengerid"] + "\n"))
+						params["moibleno"] + "\n"))
 				}
 			} else {
 				w.WriteHeader(
@@ -174,15 +174,40 @@ func passenger(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func main() {
+// DB Functions
+type Passenger struct { // map this type to the record in the table
+	PassengerID  int
+	FirstName    string
+	LastName     string
+	MobileNo     int
+	EmailAddress string
+}
 
-	// instantiate courses
+func AddPassengerToDB(passengerInfo passengerInfo) {
+	var passenger Passenger
+	passenger.FirstName = passengerInfo.FirstName
+	passenger.LastName = passengerInfo.LastName
+	passenger.MobileNo = passengerInfo.MobileNo
+	passenger.EmailAddress = passengerInfo.EmailAddress
+	PassengerDB.PassengerDB("Insert", PassengerDB.Passenger(passenger))
+}
+
+func UpdatePassengerToDB(passengerInfo passengerInfo) {
+	var passenger Passenger
+	passenger.FirstName = passengerInfo.FirstName
+	passenger.LastName = passengerInfo.LastName
+	passenger.MobileNo = passengerInfo.MobileNo
+	passenger.EmailAddress = passengerInfo.EmailAddress
+	PassengerDB.PassengerDB("Update", PassengerDB.Passenger(passenger))
+}
+
+func main() {
+	// instantiate passengers
 	passengers = make(map[string]passengerInfo)
 
 	router := mux.NewRouter()
-	router.HandleFunc("/api/v1/", home)
 	router.HandleFunc("/api/v1/passengers", allPassengers)
-	router.HandleFunc("/api/v1/passengers/{passengerid}", passenger).Methods(
+	router.HandleFunc("/api/v1/passengers/{moibleno}", passenger).Methods(
 		"GET", "PUT", "POST", "DELETE")
 
 	fmt.Println("Listening at port 1001")
