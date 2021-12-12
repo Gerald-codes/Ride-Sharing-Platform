@@ -7,6 +7,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+var id string
+
 type Passenger struct { // map this type to the record in the table
 	PassengerID  int
 	FirstName    string
@@ -25,10 +27,10 @@ func InsertRecord(db *sql.DB, FN string, LN string, MN int, EA string) {
 	}
 }
 
-func UpdatePassenger(db *sql.DB, FN string, LN string, MN int, EA string) {
+func UpdatePassenger(db *sql.DB, FN string, LN string, MN int, EA string, ID int) {
 	query := fmt.Sprintf(
-		"UPDATE ride_sharing.Passengers SET FirstName='%s', LastName='%s',MobileNo=%d,EmailAddress='%s'",
-		FN, LN, MN, EA)
+		"UPDATE ride_sharing.Passengers SET FirstName='%s', LastName='%s',MobileNo=%d ,EmailAddress='%s' WHERE PassengerID=%d",
+		FN, LN, MN, EA, ID)
 
 	_, err := db.Query(query)
 	if err != nil {
@@ -56,6 +58,36 @@ func GetRecords(db *sql.DB) {
 	}
 }
 
+func GetLatestID() (res string) {
+	db, Qerr := sql.Open("mysql", "user:password@tcp(127.0.0.1:3306)/ride_sharing")
+
+	// handle error
+	if Qerr != nil {
+		panic(Qerr.Error())
+	}
+
+	// defer the close till after the main function has finished executing
+	defer db.Close()
+
+	results, err := db.Query("SELECT MAX(PassengerID) FROM ride_sharing.Passengers")
+
+	if err != nil {
+		panic(err.Error())
+	}
+
+	for results.Next() {
+		// map this type to the record in the table
+		var res string
+		err = results.Scan(&res)
+		if err != nil {
+			panic(err.Error())
+		}
+		id = res
+	}
+
+	return id
+}
+
 func PassengerDB(method string, p Passenger) {
 	// Use mysql as driverName and a valid DSN as dataSourceName:
 	db, err := sql.Open("mysql", "user:password@tcp(127.0.0.1:3306)/ride_sharing")
@@ -68,7 +100,7 @@ func PassengerDB(method string, p Passenger) {
 		InsertRecord(db, p.FirstName, p.LastName, p.MobileNo, p.EmailAddress)
 		fmt.Println("Inserted ", p.FirstName, " Database")
 	} else if method == "Update" {
-		UpdatePassenger(db, p.FirstName, p.LastName, p.MobileNo, p.EmailAddress)
+		UpdatePassenger(db, p.FirstName, p.LastName, p.MobileNo, p.EmailAddress, p.PassengerID)
 		fmt.Println("Updated ", p.FirstName, " Database")
 	}
 

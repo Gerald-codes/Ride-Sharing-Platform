@@ -32,8 +32,22 @@ func GetTrip(code string) {
 func GetAllTrips(code string) {
 	url := baseURL
 	if code != "" {
-		url = baseURL
+		url = baseURL + "/" + code + "?key=" + key + "&filter_by=nric"
 	}
+	response, err := http.Get(url)
+
+	if err != nil {
+		fmt.Printf("The HTTP request failed with error %s\n", err)
+	} else {
+		data, _ := ioutil.ReadAll(response.Body)
+		fmt.Println(response.StatusCode, "Successfully retrieved Trip History")
+		fmt.Println(string(data))
+		response.Body.Close()
+	}
+}
+
+func GetPendingTrips() {
+	url := baseURL + "?key=" + key + "&filter_by=pending"
 	response, err := http.Get(url)
 
 	if err != nil {
@@ -42,6 +56,10 @@ func GetAllTrips(code string) {
 		data, _ := ioutil.ReadAll(response.Body)
 		fmt.Println(response.StatusCode)
 		fmt.Println(string(data))
+		// for i, v := range data {
+		// 	fmt.Println("TripID\tFirstName\tLastName\tMobileNo\tPickUpPostalCode\tDropOffPostalCode\t")
+		// 	fmt.Print()
+		// }
 		response.Body.Close()
 	}
 }
@@ -51,40 +69,38 @@ func AddTrip(code string, jsonData map[string]interface{}) {
 	response, err := http.Post(baseURL+"/"+code+"?key="+key,
 		"application/json", bytes.NewBuffer(jsonValue))
 
-	fmt.Println("\nInsert Trip Api called")
-
 	if err != nil {
 		fmt.Printf("The HTTP request failed with error %s\n", err)
-	} else {
-		data, _ := ioutil.ReadAll(response.Body)
-		fmt.Println(response.StatusCode)
-		fmt.Println(string(data))
-		response.Body.Close()
 	}
+	// data, _ := ioutil.ReadAll(response.Body)
+	if response.StatusCode == 200 {
+		fmt.Println("Trip successfully created")
+	}
+	response.Body.Close()
+
 }
+
 func GetLatestTripID() (res string) {
-	url := baseURL + "/" + "latest" + "?key=" + key
+	url := baseURL + "?key=" + key + "&filter_by=latest"
 	response, err := http.Get(url)
 
 	if err != nil {
 		fmt.Printf("The HTTP request failed with error %s\n", err)
 	} else {
 		data, _ := ioutil.ReadAll(response.Body)
-		// fmt.Println(response.StatusCode)
-		// fmt.Println(string(data[12:len(data)-2]), "RESP")
-
 		response.Body.Close()
 		return string(data[12 : len(data)-2])
 	}
 	return
 }
+
 func UpdateTrip(code string, jsonData map[string]interface{}) {
 	jsonValue, _ := json.Marshal(jsonData)
 
 	request, NRerr := http.NewRequest(http.MethodPut,
 		baseURL+"/"+code+"?key="+key,
 		bytes.NewBuffer(jsonValue))
-
+	fmt.Print(jsonData, "API")
 	if NRerr != nil {
 		fmt.Printf("New request failed with error %s\n", NRerr)
 	}
@@ -94,13 +110,10 @@ func UpdateTrip(code string, jsonData map[string]interface{}) {
 	client := &http.Client{}
 	response, err := client.Do(request)
 
-	fmt.Println("\nUpdate Trip Api called")
-
 	if err != nil {
 		fmt.Printf("The HTTP request failed with error %s\n", err)
 	} else {
 		data, _ := ioutil.ReadAll(response.Body)
-		fmt.Println(response.StatusCode)
 		fmt.Println(string(data))
 		response.Body.Close()
 	}

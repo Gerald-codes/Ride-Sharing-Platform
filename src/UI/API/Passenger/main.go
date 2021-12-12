@@ -86,8 +86,21 @@ func UpdatePassenger(code string, jsonData map[string]interface{}) {
 		fmt.Printf("The HTTP request failed with error %s\n", err)
 	} else {
 		data, _ := ioutil.ReadAll(response.Body)
-		fmt.Println(response.StatusCode)
 		fmt.Println(string(data))
 		response.Body.Close()
 	}
+}
+
+func GetLatestPassengerID() (res string) {
+	url := baseURL + "?key=" + key + "&filter_by=latest"
+	response, err := http.Get(url)
+
+	if err != nil {
+		fmt.Printf("The HTTP request failed with error %s\n", err)
+	} else {
+		data, _ := ioutil.ReadAll(response.Body)
+		response.Body.Close()
+		return string(data[12 : len(data)-2])
+	}
+	return
 }

@@ -12,12 +12,12 @@ import (
 )
 
 type driverInfo struct {
-	NRICNo       string `json:"NRIC No"`
-	FirstName    string `json:"First Name"`
-	LastName     string `json:"Last Name"`
-	MobileNo     int    `json:"Mobile No"`
-	EmailAddress string `json:"Email Address"`
-	LicenseNo    string `json:"License No"`
+	NRICNo       string `json:"NRICNo"`
+	FirstName    string `json:"FirstName"`
+	LastName     string `json:"LastName"`
+	MobileNo     int    `json:"MobileNo"`
+	EmailAddress string `json:"EmailAddress"`
+	LicenseNo    string `json:"LicenseNo"`
 	Status       string `json:"Status"`
 }
 
@@ -37,22 +37,22 @@ func validKey(r *http.Request) bool {
 	}
 }
 
-func home(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Welcome to the Driver REST API!")
-}
-
 func allDrivers(w http.ResponseWriter, r *http.Request) {
-	// fmt.Fprintf(w, "List of all drivers")
-
-	// returns the key/value pairs in the query string as a map object
-	kv := r.URL.Query()
-
-	for k, v := range kv {
-		fmt.Println(k, v) // print out the key/value pair
+	if !validKey(r) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("401 - Invalid key\n"))
+		return
 	}
-	// returns all the Drivers in JSON
-	json.NewEncoder(w).Encode(drivers)
-	fmt.Print("\nASDAD")
+	// // fmt.Fprintf(w, "List of all drivers")
+
+	// // returns the key/value pairs in the query string as a map object
+	// kv := r.URL.Query()
+
+	// for k, v := range kv {
+	// 	fmt.Println(k, v) // print out the key/value pair
+	// }
+	// // returns all the Drivers in JSON
+	// json.NewEncoder(w).Encode(drivers)
 
 }
 
@@ -100,11 +100,7 @@ func driver(w http.ResponseWriter, r *http.Request) {
 				// convert JSON to object
 				json.Unmarshal(reqBody, &newDriver)
 
-				if newDriver.FirstName == "" &&
-					newDriver.LastName == "" &&
-					newDriver.MobileNo == 0 &&
-					newDriver.LicenseNo == "" &&
-					newDriver.EmailAddress == "" {
+				if newDriver.FirstName == "" {
 
 					w.WriteHeader(
 						http.StatusUnprocessableEntity)
@@ -143,10 +139,7 @@ func driver(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				json.Unmarshal(reqBody, &newDriver)
 
-				if newDriver.FirstName == "" &&
-					newDriver.LastName == "" &&
-					newDriver.LicenseNo == "" &&
-					newDriver.EmailAddress == "" {
+				if newDriver.FirstName == "" {
 					w.WriteHeader(
 						http.StatusUnprocessableEntity)
 					w.Write([]byte(
@@ -235,10 +228,9 @@ func main() {
 	drivers = make(map[string]driverInfo)
 
 	router := mux.NewRouter()
-	router.HandleFunc("/api/v1/", home)
 	router.HandleFunc("/api/v1/drivers", allDrivers)
 	router.HandleFunc("/api/v1/drivers/{nricno}", driver).Methods(
-		"GET", "PUT", "POST", "DELETE")
+		"GET", "PUT", "POST")
 
 	fmt.Println("Listening at port 1000")
 	log.Fatal(http.ListenAndServe(":1000", router))
