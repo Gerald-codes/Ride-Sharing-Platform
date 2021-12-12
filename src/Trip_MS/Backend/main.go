@@ -26,10 +26,20 @@ type tripInfo struct {
 type id struct {
 	LatestID int `json:"LatestID"`
 }
+type TripDetails struct { // map this type to the record in the table
+	TripID            int    `json:"TripID"`
+	FirstName         string `json:"FirstName"`
+	LastName          string `json:"LastName"`
+	MobileNo          int    `json:"MobileNo"`
+	PickUpPostalCode  int    `json:"PickUpPostalCode"`
+	DropOffPostalCode int    `json:"DropOffPostalCode"`
+}
 
 // used for storing courses on the REST API
 var trips map[string]tripInfo
 var latestid map[string]id
+var tripDetails map[string]TripDetails
+var passID string
 
 func validKey(r *http.Request) bool {
 	v := r.URL.Query()
@@ -59,7 +69,7 @@ func getLatest(w http.ResponseWriter, r *http.Request) {
 		jsonData := map[string]interface{}{"LatestID": (intVar + 1)}
 		jsonValue, _ := json.Marshal(jsonData)
 		request, NRerr := http.NewRequest(http.MethodPut,
-			"http://localhost:1002/api/v1/trips/latest?key=2c78afaf-97da-4816-bbee-9ad239abb296", bytes.NewBuffer(jsonValue))
+			"http://localhost:1002/api/v1/trips?key=2c78afaf-97da-4816-bbee-9ad239abb296&filter_by=latest", bytes.NewBuffer(jsonValue))
 
 		if NRerr != nil {
 			fmt.Printf("New request failed with error %s\n", NRerr)
@@ -69,7 +79,7 @@ func getLatest(w http.ResponseWriter, r *http.Request) {
 
 		client := &http.Client{}
 		response, err := client.Do(request)
-		fmt.Println("\nUpdate Trip Api called")
+
 		if err != nil {
 			fmt.Printf("The HTTP request failed with error %s\n", err)
 		} else {
@@ -87,7 +97,6 @@ func getLatest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if r.Header.Get("Content-type") == "application/json" {
-		fmt.Print("TESTEST")
 		if r.Method == "PUT" {
 			if !validKey(r) {
 				w.WriteHeader(http.StatusNotFound)
@@ -121,18 +130,130 @@ func getLatest(w http.ResponseWriter, r *http.Request) {
 }
 
 func allTrips(w http.ResponseWriter, r *http.Request) {
-	// fmt.Fprintf(w, "List of all Trips")
-
-	// returns the key/value pairs in the query string as a map object
-	kv := r.URL.Query()
-
-	for k, v := range kv {
-		fmt.Println(k, v) // print out the key/value pair
+	if !validKey(r) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("401 - Invalid key\n"))
+		return
 	}
+	v := r.URL.Query()
 
-	// returns all the courses in JSON
-	json.NewEncoder(w).Encode(trips)
+	if filter_by, ok := v["filter_by"]; ok {
+		if filter_by[0] == "latest" {
+			getLatest(w, r)
+		} else if filter_by[0] == "pending" {
+			getPendingTrips(w, r)
+		} else if filter_by[0] == "nric" {
+			var newTripDetail []tripInfo
+			if !validKey(r) {
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte("401 - Invalid key\n"))
+				return
+			}
 
+			reqBody, err := ioutil.ReadAll(r.Body)
+
+			if err == nil {
+				json.Unmarshal(reqBody, &newTripDetail)
+			} else {
+				fmt.Print(err, "ERROR")
+			}
+			var id []string
+			for i, v := range newTripDetail {
+				if passID == strconv.Itoa(v.PassengerID) {
+					id = append(id, strconv.Itoa(v.TripID))
+					trips[id[i]] = newTripDetail[i]
+				}
+			}
+			w.WriteHeader(http.StatusAccepted)
+			w.Write([]byte("201 - Trip Added: \n"))
+		}
+	}
+}
+
+func getPendingTrips(w http.ResponseWriter, r *http.Request) {
+	var newTripDetail []TripDetails
+	if r.Method == "GET" {
+		tripArray := TripDB.GetPendingRecords()
+		jsonValue, _ := json.Marshal(tripArray)
+		request, NRerr := http.NewRequest(http.MethodPut,
+			"http://localhost:1002/api/v1/trips?key=2c78afaf-97da-4816-bbee-9ad239abb296&filter_by=pending", bytes.NewBuffer(jsonValue))
+
+		if NRerr != nil {
+			fmt.Printf("New request failed with error %s\n", NRerr)
+		}
+
+		request.Header.Set("Content-Type", "application/json")
+
+		client := &http.Client{}
+		response, err := client.Do(request)
+		if err != nil {
+			fmt.Printf("The HTTP request failed with error %s\n", err)
+		} else {
+			data, _ := ioutil.ReadAll(response.Body)
+			fmt.Println(string(data))
+			response.Body.Close()
+		}
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "    ")
+		enc.Encode(tripDetails)
+
+	}
+	if r.Header.Get("Content-type") == "application/json" {
+		if r.Method == "PUT" {
+			if !validKey(r) {
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte("401 - Invalid key\n"))
+				return
+			}
+
+			reqBody, err := ioutil.ReadAll(r.Body)
+
+			if err == nil {
+				json.Unmarshal(reqBody, &newTripDetail)
+			} else {
+				fmt.Print(err, "ERROR")
+			}
+			var id []string
+			for i, v := range newTripDetail {
+				id = append(id, strconv.Itoa(v.TripID))
+				tripDetails[id[i]] = newTripDetail[i]
+			}
+			w.WriteHeader(http.StatusAccepted)
+			w.Write([]byte("201 - Pending Trip Added: \n"))
+		}
+	}
+}
+
+func getTripHistory(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	passID = params["tripid"]
+	if r.Method == "GET" {
+
+		tripArray := TripDB.GetRecords()
+		jsonValue, _ := json.Marshal(tripArray)
+		request, NRerr := http.NewRequest(http.MethodPut,
+			"http://localhost:1002/api/v1/trips?key=2c78afaf-97da-4816-bbee-9ad239abb296&filter_by=nric", bytes.NewBuffer(jsonValue))
+
+		if NRerr != nil {
+			fmt.Printf("New request failed with error %s\n", NRerr)
+		}
+
+		request.Header.Set("Content-Type", "application/json")
+
+		client := &http.Client{}
+		response, err := client.Do(request)
+		if err != nil {
+			fmt.Printf("The HTTP request failed with error %s\n", err)
+		} else {
+			data, _ := ioutil.ReadAll(response.Body)
+			fmt.Println(string(data))
+			response.Body.Close()
+		}
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "    ")
+		enc.Encode(trips)
+
+	}
 }
 
 func trip(w http.ResponseWriter, r *http.Request) {
@@ -145,13 +266,7 @@ func trip(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 
 	if r.Method == "GET" {
-		if _, ok := trips[params["tripid"]]; ok {
-			json.NewEncoder(w).Encode(
-				trips[params["tripid"]])
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte("404 - No Trip found" + "\n"))
-		}
+		getTripHistory(w, r)
 	}
 
 	if r.Method == "DELETE" {
@@ -220,10 +335,8 @@ func trip(w http.ResponseWriter, r *http.Request) {
 
 			if err == nil {
 				json.Unmarshal(reqBody, &newTrip)
-
-				if newTrip.TripID == 0 &&
-					newTrip.DropOffPostalCode == 0 &&
-					newTrip.PickUpPostalCode == 0 {
+				fmt.Print(newTrip)
+				if newTrip.DriverID == 0 {
 					w.WriteHeader(
 						http.StatusUnprocessableEntity)
 					w.Write([]byte(
@@ -245,6 +358,8 @@ func trip(w http.ResponseWriter, r *http.Request) {
 				} else {
 					// update course
 					trips[params["tripid"]] = newTrip
+					fmt.Print("HELLLLO\n")
+					UpdateTripToDB(newTrip)
 					w.WriteHeader(http.StatusAccepted)
 					w.Write([]byte("202 - Trip updated: " +
 						params["tripid"] + "\n"))
@@ -273,29 +388,43 @@ type Trip struct { // map this type to the record in the table
 }
 
 func AddTripToDB(tripInfo tripInfo) {
-	fmt.Println("HEYHEYHEY")
 	var trip Trip
 	trip.TripID = tripInfo.TripID
 	trip.PassengerID = tripInfo.PassengerID
 	trip.PickUpPostalCode = tripInfo.PickUpPostalCode
 	trip.DropOffPostalCode = tripInfo.DropOffPostalCode
-	trip.TripStartTime = tripInfo.TripStartTime
 	trip.Status = tripInfo.Status
 	TripDB.TripDB("Insert", TripDB.Trip(trip))
 }
+func UpdateTripToDB(tripInfo tripInfo) {
+	fmt.Print("HEY")
+	var trip Trip
+	trip.PassengerID = 28
+	trip.TripID = tripInfo.TripID
+	trip.DriverID = tripInfo.DriverID
+	trip.TripStartTime = tripInfo.TripStartTime
+	trip.TripEndTime = tripInfo.TripEndTime
+	trip.Status = tripInfo.Status
+	if tripInfo.DriverID == 0 {
+		fmt.Print("ASDASD")
+		TripDB.TripDB("Start", TripDB.Trip(trip))
+	} else {
+		TripDB.TripDB("End", TripDB.Trip(trip))
+	}
 
+}
 func main() {
 
 	// instantiate courses
 	trips = make(map[string]tripInfo)
 	latestid = make(map[string]id)
+	tripDetails = make(map[string]TripDetails)
 
 	router := mux.NewRouter()
-	router.HandleFunc("/api/v1/trips/latest", getLatest).Methods(
-		"GET", "PUT")
-	router.HandleFunc("/api/v1/trips", allTrips)
+
+	router.HandleFunc("/api/v1/trips", allTrips).Methods("GET", "PUT")
 	router.HandleFunc("/api/v1/trips/{tripid}", trip).Methods(
-		"GET", "PUT", "POST", "DELETE")
+		"GET", "PUT", "POST")
 
 	fmt.Println("Listening at port 1002")
 	log.Fatal(http.ListenAndServe(":1002", router))

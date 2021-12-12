@@ -51,13 +51,12 @@ func AddDriver(code string, jsonData map[string]interface{}) {
 
 	response, err := http.Post(baseURL+"/"+code+"?key="+key,
 		"application/json", bytes.NewBuffer(jsonValue))
-	fmt.Println("\nAdd Driver Api called")
-	fmt.Println("TEST", bytes.NewBuffer(jsonValue))
+
 	if err != nil {
 		fmt.Printf("The HTTP request failed with error %s\n", err)
 	} else {
 		data, _ := ioutil.ReadAll(response.Body)
-		fmt.Println(response.StatusCode)
+		// fmt.Println(response.StatusCode)
 		fmt.Println(string(data))
 		response.Body.Close()
 	}
@@ -78,7 +77,6 @@ func UpdateDriver(code string, jsonData map[string]interface{}) {
 
 	client := &http.Client{}
 	response, err := client.Do(request)
-	fmt.Println("\nUpdate Driver Api called")
 
 	if err != nil {
 		fmt.Printf("The HTTP request failed with error %s\n", err)

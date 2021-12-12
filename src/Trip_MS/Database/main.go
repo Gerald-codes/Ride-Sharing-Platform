@@ -20,19 +20,38 @@ type Trip struct { // map this type to the record in the table
 	Status            string
 }
 
-func EditRecord(db *sql.DB, ID int, FN string, LN string, EA string) {
+type TripDetails struct { // map this type to the record in the table
+	TripID            int
+	FirstName         string
+	LastName          string
+	MobileNo          int
+	PickUpPostalCode  int
+	DropOffPostalCode int
+}
+
+func StartTrip(db *sql.DB, DID int, ST string, S string, TID int) {
 	query := fmt.Sprintf(
-		"UPDATE Passenger SET FirstName='%s', LastName='%s', EmailAddress='%s' WHERE PassengerID=%d",
-		FN, LN, EA, ID)
+		"UPDATE ride_sharing.Trips SET DriverID=%d, TripStartTime='%s', Status='%s' WHERE TripID=%d ",
+		DID, ST, S, TID)
 	_, err := db.Query(query)
 	if err != nil {
 		panic(err.Error())
 	}
 }
 
-func InsertRecord(db *sql.DB, TID int, PID int, PU int, DO int, ST string, S string) {
-	query := fmt.Sprintf("INSERT INTO ride_sharing.Trips (TripID, PassengerID, PickUpPostalCode, DropOffPostalCode, TripStartTime, Status) VALUES ( %d, %d, %d, %d,'%s','%s')",
-		TID, PID, PU, DO, ST, S)
+func EndTrip(db *sql.DB, ET string, S string, TID int) {
+	query := fmt.Sprintf(
+		"UPDATE ride_sharing.Trips SET TripEndTime='%s', Status='%s' WHERE TripID=%d",
+		ET, S, TID)
+	_, err := db.Query(query)
+	if err != nil {
+		panic(err.Error())
+	}
+}
+
+func InsertRecord(db *sql.DB, TID int, PID int, PU int, DO int, S string) {
+	query := fmt.Sprintf("INSERT INTO ride_sharing.Trips (TripID, PassengerID, PickUpPostalCode, DropOffPostalCode, Status) VALUES ( %d, %d, %d, %d,'%s')",
+		TID, PID, PU, DO, S)
 	_, err := db.Query(query)
 
 	if err != nil {
@@ -40,27 +59,71 @@ func InsertRecord(db *sql.DB, TID int, PID int, PU int, DO int, ST string, S str
 	}
 }
 
-func GetRecords(db *sql.DB) {
-	results, err := db.Query("Select * FROM ride_sharing.Passenger")
+func GetPendingRecords() (res []TripDetails) {
+	// Use mysql as driverName and a valid DSN as dataSourceName:
+	db, Qerr := sql.Open("mysql", "user:password@tcp(127.0.0.1:3306)/ride_sharing")
+
+	// handle error
+	if Qerr != nil {
+		panic(Qerr.Error())
+	}
+
+	// defer the close till after the main function has finished executing
+	defer db.Close()
+
+	results, err := db.Query("SELECT t.TripID, p.FirstName,p.LastName,p.MobileNo,t.PickUpPostalCode, t.DropOffPostalCode FROM ride_sharing.Passengers p INNER JOIN ride_sharing.Trips t ON p.PassengerID=t.PassengerID")
 
 	if err != nil {
 		panic(err.Error())
 	}
-
+	var pendingTripRecords []TripDetails
 	for results.Next() {
 		// map this type to the record in the table
-		var trip Trip
-		err = results.Scan(&trip.TripID, &trip.PassengerID, &trip.DriverID, &trip.PickUpPostalCode,
-			&trip.DropOffPostalCode, &trip.TripStartTime, &trip.TripEndTime, &trip.Status)
+		var tripDetails TripDetails
+		err = results.Scan(&tripDetails.TripID, &tripDetails.FirstName, &tripDetails.LastName, &tripDetails.MobileNo, &tripDetails.PickUpPostalCode,
+			&tripDetails.DropOffPostalCode)
 		if err != nil {
 			panic(err.Error())
 		}
-		fmt.Println(trip.TripID, trip.PassengerID, trip.DriverID, trip.PickUpPostalCode,
-			trip.DropOffPostalCode, trip.TripStartTime, trip.TripEndTime, trip.Status)
+		// fmt.Println(tripDetails.TripID, tripDetails.FirstName, tripDetails.LastName, tripDetails.MobileNo, tripDetails.PickUpPostalCode,
+		// 	tripDetails.DropOffPostalCode)
+		pendingTripRecords = append(pendingTripRecords, tripDetails)
 	}
+	// fmt.Print("ARRAY!!", pendingTripRecords)
+	return pendingTripRecords
 }
-func GetLatestID() (res string) {
+
+func GetRecords() (res []Trip) {
 	// Use mysql as driverName and a valid DSN as dataSourceName:
+	db, Qerr := sql.Open("mysql", "user:password@tcp(127.0.0.1:3306)/ride_sharing")
+
+	// handle error
+	if Qerr != nil {
+		panic(Qerr.Error())
+	}
+
+	// defer the close till after the main function has finished executing
+	defer db.Close()
+	results, err := db.Query("Select * FROM ride_sharing.Trips WHERE Status='Completed'")
+	if err != nil {
+		panic(err.Error())
+	}
+	var TripRecords []Trip
+	for results.Next() {
+		// map this type to the record in the table
+		var tripDetails Trip
+		err = results.Scan(&tripDetails.TripID, &tripDetails.PassengerID, &tripDetails.DriverID, &tripDetails.Status, &tripDetails.PickUpPostalCode,
+			&tripDetails.DropOffPostalCode, &tripDetails.TripStartTime, &tripDetails.TripEndTime)
+		if err != nil {
+			panic(err.Error())
+		}
+		TripRecords = append(TripRecords, tripDetails)
+	}
+	// fmt.Print("ARRAY!!", TripRecords)
+	return TripRecords
+}
+
+func GetLatestID() (res string) {
 	db, Qerr := sql.Open("mysql", "user:password@tcp(127.0.0.1:3306)/ride_sharing")
 
 	// handle error
@@ -98,16 +161,18 @@ func TripDB(method string, t Trip) {
 		panic(err.Error())
 	}
 	if method == "Insert" {
-		InsertRecord(db, t.TripID, t.PassengerID, t.PickUpPostalCode, t.DropOffPostalCode, t.TripStartTime, t.Status)
+		InsertRecord(db, t.TripID, t.PassengerID, t.PickUpPostalCode, t.DropOffPostalCode, t.Status)
 		fmt.Println("Insert Trip", t.TripStartTime, " Database")
-	} else if method == "Update" {
-		fmt.Println("Updated Trip", t.TripID, " Database")
+	} else if method == "Start" {
+		fmt.Println("Started Trip", t.TripID, " Database")
+		StartTrip(db, 18, t.TripStartTime, t.Status, 9)
+	} else if method == "End" {
+		EndTrip(db, t.TripStartTime, t.Status, t.TripID)
+		fmt.Println("Ended Trip", t.TripID, " Database")
 	}
-	// GetRecords(db)
 
 	// defer the close till after the main function has finished executing
 	defer db.Close()
 
 	fmt.Println("Database opened")
-	return
 }
