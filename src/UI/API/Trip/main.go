@@ -1,4 +1,4 @@
-package PassengerAPI
+package TripAPI
 
 import (
 	"bytes"
@@ -8,11 +8,11 @@ import (
 	"net/http"
 )
 
-const baseURL = "http://localhost:1001/api/v1/passengers"
+const baseURL = "http://localhost:1002/api/v1/trips"
 const key = "2c78afaf-97da-4816-bbee-9ad239abb296"
 
-// Passenger API Functions
-func GetPassenger(code string) {
+// Trip API Functions
+func GetTrip(code string) {
 	url := baseURL
 	if code != "" {
 		url = baseURL + "/" + code + "?key=" + key
@@ -29,7 +29,7 @@ func GetPassenger(code string) {
 	}
 }
 
-func GetAllPassenger(code string) {
+func GetAllTrips(code string) {
 	url := baseURL
 	if code != "" {
 		url = baseURL
@@ -46,13 +46,12 @@ func GetAllPassenger(code string) {
 	}
 }
 
-func AddPassenger(code string, jsonData map[string]interface{}) {
+func AddTrip(code string, jsonData map[string]interface{}) {
 	jsonValue, _ := json.Marshal(jsonData)
-
 	response, err := http.Post(baseURL+"/"+code+"?key="+key,
 		"application/json", bytes.NewBuffer(jsonValue))
 
-	fmt.Println("\nInsert Passenger Api called")
+	fmt.Println("\nInsert Trip Api called")
 
 	if err != nil {
 		fmt.Printf("The HTTP request failed with error %s\n", err)
@@ -63,8 +62,23 @@ func AddPassenger(code string, jsonData map[string]interface{}) {
 		response.Body.Close()
 	}
 }
+func GetLatestTripID() (res string) {
+	url := baseURL + "/" + "latest" + "?key=" + key
+	response, err := http.Get(url)
 
-func UpdatePassenger(code string, jsonData map[string]interface{}) {
+	if err != nil {
+		fmt.Printf("The HTTP request failed with error %s\n", err)
+	} else {
+		data, _ := ioutil.ReadAll(response.Body)
+		// fmt.Println(response.StatusCode)
+		// fmt.Println(string(data[12:len(data)-2]), "RESP")
+
+		response.Body.Close()
+		return string(data[12 : len(data)-2])
+	}
+	return
+}
+func UpdateTrip(code string, jsonData map[string]interface{}) {
 	jsonValue, _ := json.Marshal(jsonData)
 
 	request, NRerr := http.NewRequest(http.MethodPut,
@@ -80,7 +94,7 @@ func UpdatePassenger(code string, jsonData map[string]interface{}) {
 	client := &http.Client{}
 	response, err := client.Do(request)
 
-	fmt.Println("\nUpdate Passenger Api called")
+	fmt.Println("\nUpdate Trip Api called")
 
 	if err != nil {
 		fmt.Printf("The HTTP request failed with error %s\n", err)

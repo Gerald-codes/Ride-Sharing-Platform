@@ -87,7 +87,7 @@ func passenger(w http.ResponseWriter, r *http.Request) {
 			// read the string sent to the service
 			var newPassenger passengerInfo
 			reqBody, err := ioutil.ReadAll(r.Body)
-
+			fmt.Print("POSTeded", reqBody)
 			if err == nil {
 				// convert JSON to object
 				json.Unmarshal(reqBody, &newPassenger)

@@ -71,6 +71,7 @@ func PassengerDB(method string, p Passenger) {
 		UpdatePassenger(db, p.FirstName, p.LastName, p.MobileNo, p.EmailAddress)
 		fmt.Println("Updated ", p.FirstName, " Database")
 	}
+
 	GetRecords(db)
 
 	// defer the close till after the main function has finished executing
