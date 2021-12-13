@@ -13,7 +13,8 @@ For BackEnd, It can cater to both mobile and desktop as both devices can connect
 ---
 ## Architecture diagram
 
-![image](https://user-images.githubusercontent.com/77374003/145780560-64ceca45-4e9d-4180-b7c7-744f23841666.png)
+![image](https://user-images.githubusercontent.com/77374003/145786170-c4d719d5-a1e5-461c-b4b8-08f49acd1071.png)
+
 
 FrontEnd will call APIs to send and retrieve data from BackEnd through respectives ports (Driver - 1000, Passenger - 1001 & Trip - 1002).
 
