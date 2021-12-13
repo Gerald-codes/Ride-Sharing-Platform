@@ -1,0 +1,47 @@
+CREATE TABLE `ride_sharing`.`Drivers` (
+  `DriverID` INT NOT NULL AUTO_INCREMENT,
+  `FirstName` VARCHAR(45) NOT NULL,
+  `LastName` VARCHAR(45) NOT NULL,
+  `MobileNo` INT NOT NULL,
+  `EmailAddress` VARCHAR(320) NOT NULL,
+  `LicenseNo` VARCHAR(10) NOT NULL,
+  `Status` VARCHAR(45) NOT NULL,
+  PRIMARY KEY (`DriverID`),
+  UNIQUE INDEX `DriverID_UNIQUE` (`DriverID` ASC) VISIBLE);
+
+CREATE TABLE `ride_sharing`.`Passengers` (
+  `PassengerID` INT NOT NULL AUTO_INCREMENT,
+  `FirstName` VARCHAR(30) NOT NULL,
+  `LastName` VARCHAR(30) NOT NULL,
+  `MobileNo` INT NOT NULL,
+  `EmailAddress` VARCHAR(320) NOT NULL,
+  PRIMARY KEY (`PassengerID`),
+  UNIQUE INDEX `PassengerID_UNIQUE` (`PassengerID` ASC) VISIBLE);
+
+
+CREATE TABLE `ride_sharing`.`Trips` (
+  `TripID` INT NOT NULL AUTO_INCREMENT,
+  `PassengerID` INT NOT NULL,
+  `DriverID` INT NULL DEFAULT NULL,
+  `Status` VARCHAR(45) NULL DEFAULT 'Pending',
+  `PickUpPostalCode` INT NOT NULL,
+  `DropOffPostalCode` INT NOT NULL,
+  `TripStartTime` VARCHAR(45) NULL DEFAULT '',
+  `TripEndTime` VARCHAR(45) NULL DEFAULT '',
+  PRIMARY KEY (`TripID`),
+  UNIQUE INDEX `TripID_UNIQUE` (`TripID` ASC) VISIBLE,
+  INDEX `PassengerID_idx` (`PassengerID` ASC) VISIBLE,
+  INDEX `DriverID_idx` (`DriverID` ASC) VISIBLE,
+  CONSTRAINT `PassengerID`
+    FOREIGN KEY (`PassengerID`)
+    REFERENCES `ride_sharing`.`Passengers` (`PassengerID`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `DriverID`
+    FOREIGN KEY (`DriverID`)
+    REFERENCES `ride_sharing`.`Drivers` (`DriverID`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION);
+
+CREATE DEFINER = CURRENT_USER TRIGGER `ride_sharing`.`SystemAssignDriver` BEFORE INSERT ON `Trips` FOR EACH ROW
+	SET NEW.DriverID = (SELECT DriverID FROM ride_sharing.Drivers WHERE Status="Available" LIMIT 1);

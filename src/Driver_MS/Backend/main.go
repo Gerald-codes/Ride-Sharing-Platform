@@ -1,18 +1,21 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	DriverDB "importMods/Driver_MS/Database"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 )
 
+// Create
 type driverInfo struct {
-	NRICNo       string `json:"NRICNo"`
+	DriverID     int    `json:"DriverID"`
 	FirstName    string `json:"FirstName"`
 	LastName     string `json:"LastName"`
 	MobileNo     int    `json:"MobileNo"`
@@ -20,9 +23,13 @@ type driverInfo struct {
 	LicenseNo    string `json:"LicenseNo"`
 	Status       string `json:"Status"`
 }
+type id struct {
+	LatestID int `json:"LatestID"`
+}
 
-// used for storing driver on the REST API
+// Used for storing driver on the REST API
 var drivers map[string]driverInfo
+var latestid map[string]id
 
 func validKey(r *http.Request) bool {
 	v := r.URL.Query()
@@ -37,23 +44,135 @@ func validKey(r *http.Request) bool {
 	}
 }
 
+func CallGetAll() {
+	driverArray := DriverDB.GetRecords()
+	jsonValue, _ := json.Marshal(driverArray)
+	request, NRerr := http.NewRequest(http.MethodPut,
+		"http://localhost:1000/api/v1/drivers?key=2c78afaf-97da-4816-bbee-9ad239abb296&getall=true", bytes.NewBuffer(jsonValue))
+
+	if NRerr != nil {
+		fmt.Printf("New request failed with error %s\n", NRerr)
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		fmt.Printf("The HTTP request failed with error %s\n", err)
+	} else {
+		data, _ := ioutil.ReadAll(response.Body)
+		fmt.Println(string(data))
+		response.Body.Close()
+	}
+}
+
 func allDrivers(w http.ResponseWriter, r *http.Request) {
 	if !validKey(r) {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("401 - Invalid key\n"))
 		return
 	}
-	// // fmt.Fprintf(w, "List of all drivers")
 
-	// // returns the key/value pairs in the query string as a map object
-	// kv := r.URL.Query()
+	v := r.URL.Query()
+	// Normal Call with Parameter Key only, Calls for Get All Driver records
+	if len(v) == 1 {
+		CallGetAll()
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "    ")
+		enc.Encode(drivers)
+	} else if getall, ok := v["getall"]; ok {
+		if getall[0] == "true" {
+			var newDriverDetail []driverInfo
 
-	// for k, v := range kv {
-	// 	fmt.Println(k, v) // print out the key/value pair
-	// }
-	// // returns all the Drivers in JSON
-	// json.NewEncoder(w).Encode(drivers)
+			reqBody, err := ioutil.ReadAll(r.Body)
 
+			if err == nil {
+				json.Unmarshal(reqBody, &newDriverDetail)
+			} else {
+				fmt.Print(err, "ERROR")
+			}
+			var id []string
+			for i, v := range newDriverDetail {
+				id = append(id, strconv.Itoa(v.DriverID))
+				drivers[id[i]] = newDriverDetail[i]
+			}
+			w.WriteHeader(http.StatusAccepted)
+		}
+	} else if filter_by, ok := v["filter_by"]; ok {
+		if filter_by[0] == "latest" {
+			getLatest(w, r)
+		}
+	}
+}
+
+// Get Latest Driver ID
+func getLatest(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	if r.Method == "GET" {
+		// GET Latest Driver ID
+		id := DriverDB.GetLatestID()
+		strVar := id
+		// atoi convert string to int
+		intVar, err := strconv.Atoi(strVar)
+		// handle error
+		if err != nil {
+			panic(err.Error())
+		}
+
+		// Backend calls PUT Request to insert DriverID, increase latest by 1
+		jsonData := map[string]interface{}{"LatestID": (intVar + 1)}
+		jsonValue, _ := json.Marshal(jsonData)
+		request, NRerr := http.NewRequest(http.MethodPut,
+			"http://localhost:1000/api/v1/drivers?key=2c78afaf-97da-4816-bbee-9ad239abb296&filter_by=latest", bytes.NewBuffer(jsonValue))
+
+		if NRerr != nil {
+			fmt.Printf("New request failed with error %s\n", NRerr)
+		}
+
+		request.Header.Set("Content-Type", "application/json")
+
+		client := &http.Client{}
+		response, err := client.Do(request)
+
+		if err != nil {
+			fmt.Printf("The HTTP request failed with error %s\n", err)
+		} else {
+			data, _ := ioutil.ReadAll(response.Body)
+			fmt.Println(response.StatusCode)
+			fmt.Println(string(data))
+			response.Body.Close()
+		}
+		if _, ok := latestid[params["latestid"]]; ok {
+			json.NewEncoder(w).Encode(
+				latestid[params["latestid"]])
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte("404 - No DriverID found" + "\n"))
+		}
+	}
+	if r.Header.Get("Content-type") == "application/json" {
+		if r.Method == "PUT" {
+			if !validKey(r) {
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte("401 - Invalid key\n"))
+				return
+			}
+
+			var newDriverID id
+			reqBody, err := ioutil.ReadAll(r.Body)
+
+			if err == nil {
+				json.Unmarshal(reqBody, &newDriverID)
+			} else {
+				fmt.Print(err, "ERROR")
+			}
+			latestid[params["latestid"]] = newDriverID
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte("201 - Latest DriverID added: " +
+				params["latestid"] + "\n"))
+		}
+	}
 }
 
 func driver(w http.ResponseWriter, r *http.Request) {
@@ -66,24 +185,18 @@ func driver(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 
 	if r.Method == "GET" {
-		if _, ok := drivers[params["nricno"]]; ok {
+		if _, ok := drivers[params["driverid"]]; ok {
 			json.NewEncoder(w).Encode(
-				drivers[params["nricno"]])
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte("404 - No driver found" + "\n"))
-		}
-	}
-
-	if r.Method == "DELETE" {
-		if _, ok := drivers[params["nricno"]]; ok {
-			delete(drivers, params["nricno"])
-			w.WriteHeader(http.StatusAccepted)
-			w.Write([]byte("202 - driver deleted: " +
-				params["nricno"] + "\n"))
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte("404 - No driver found" + "\n"))
+				drivers[params["driverid"]])
+		} else { // Scenario where GetAll Drivers wasnt called before
+			CallGetAll()
+			if _, ok := drivers[params["driverid"]]; ok {
+				json.NewEncoder(w).Encode(
+					drivers[params["driverid"]])
+			} else { //Really No Driver found
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte("404 - No Driver found"))
+			}
 		}
 	}
 
@@ -100,7 +213,7 @@ func driver(w http.ResponseWriter, r *http.Request) {
 				// convert JSON to object
 				json.Unmarshal(reqBody, &newDriver)
 
-				if newDriver.FirstName == "" {
+				if newDriver.DriverID == 0 {
 
 					w.WriteHeader(
 						http.StatusUnprocessableEntity)
@@ -111,22 +224,17 @@ func driver(w http.ResponseWriter, r *http.Request) {
 				}
 
 				// check if driver exists; add only if driver does not exist
-				if _, ok := drivers[params["nricno"]]; !ok {
-					drivers[params["nricno"]] = newDriver
+				if _, ok := drivers[params["driverid"]]; !ok {
+					drivers[params["driverid"]] = newDriver
 					AddDriverToDB(newDriver)
 					w.WriteHeader(http.StatusCreated)
 					w.Write([]byte("201 - Driver added: " +
-						params["nricno"] + "\n"))
+						params["driverid"] + "\n"))
 				} else {
 					w.WriteHeader(http.StatusConflict)
 					w.Write([]byte(
 						"409 - Duplicate Driver ID" + "\n"))
 				}
-			} else {
-				w.WriteHeader(
-					http.StatusUnprocessableEntity)
-				w.Write([]byte("422 - Please supply driver information " +
-					"in JSON format" + "\n"))
 			}
 		}
 
@@ -139,7 +247,7 @@ func driver(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				json.Unmarshal(reqBody, &newDriver)
 
-				if newDriver.FirstName == "" {
+				if newDriver.DriverID == 0 {
 					w.WriteHeader(
 						http.StatusUnprocessableEntity)
 					w.Write([]byte(
@@ -151,27 +259,21 @@ func driver(w http.ResponseWriter, r *http.Request) {
 
 				// check if driver exists; add only if
 				// driver does not exist
-				if _, ok := drivers[params["nricno"]]; !ok {
-					drivers[params["nricno"]] =
+				if _, ok := drivers[params["driverid"]]; !ok {
+					drivers[params["driverid"]] =
 						newDriver
 					AddDriverToDB(newDriver)
 					w.WriteHeader(http.StatusCreated)
 					w.Write([]byte("201 - Driver added: " +
-						params["nricno"] + "\n"))
+						params["driverid"] + "\n"))
 				} else {
 					// update driver
-					drivers[params["nricno"]] = newDriver
+					drivers[params["driverid"]] = newDriver
 					UpdateDriverToDB(newDriver)
 					w.WriteHeader(http.StatusAccepted)
-					w.Write([]byte("202 - Driver updated: " +
-						params["nricno"] + "\n"))
+					w.Write([]byte("\n202 - Driver updated: " +
+						params["driverid"] + "\n"))
 				}
-			} else {
-				w.WriteHeader(
-					http.StatusUnprocessableEntity)
-				w.Write([]byte("422 - Please supply " +
-					"driver information " +
-					"in JSON format" + "\n"))
 			}
 		}
 	}
@@ -186,14 +288,6 @@ type Driver struct { // map this type to the record in the table
 	EmailAddress string
 	LicenseNo    string
 	Status       string
-	NRICNo       string
-}
-
-func GetAllDriver() {
-	// DriverDB.GetRecords()
-}
-func GetSpecDriver() {
-	// DriverDB.GetRecords()
 }
 
 func AddDriverToDB(driverInfo driverInfo) {
@@ -201,7 +295,6 @@ func AddDriverToDB(driverInfo driverInfo) {
 	var driver Driver
 	driver.FirstName = driverInfo.FirstName
 	driver.LastName = driverInfo.LastName
-	driver.NRICNo = driverInfo.NRICNo
 	driver.MobileNo = driverInfo.MobileNo
 	driver.LicenseNo = driverInfo.LicenseNo
 	driver.Status = driverInfo.Status
@@ -212,9 +305,9 @@ func AddDriverToDB(driverInfo driverInfo) {
 func UpdateDriverToDB(driverInfo driverInfo) {
 	fmt.Println("DRIVER: ", driverInfo)
 	var driver Driver
+	driver.DriverID = driverInfo.DriverID
 	driver.FirstName = driverInfo.FirstName
 	driver.LastName = driverInfo.LastName
-	driver.NRICNo = driverInfo.NRICNo
 	driver.MobileNo = driverInfo.MobileNo
 	driver.LicenseNo = driverInfo.LicenseNo
 	driver.Status = driverInfo.Status
@@ -226,10 +319,11 @@ func main() {
 
 	// instantiate driver
 	drivers = make(map[string]driverInfo)
+	latestid = make(map[string]id)
 
 	router := mux.NewRouter()
 	router.HandleFunc("/api/v1/drivers", allDrivers)
-	router.HandleFunc("/api/v1/drivers/{nricno}", driver).Methods(
+	router.HandleFunc("/api/v1/drivers/{driverid}", driver).Methods(
 		"GET", "PUT", "POST")
 
 	fmt.Println("Listening at port 1000")

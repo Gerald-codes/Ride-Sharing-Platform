@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// Declare Stuctures of objects and Variables
 type tripInfo struct {
 	TripID            int    `json:"TripID"`
 	PassengerID       int    `json:"PassengerID"`
@@ -35,12 +36,12 @@ type TripDetails struct { // map this type to the record in the table
 	DropOffPostalCode int    `json:"DropOffPostalCode"`
 }
 
-// used for storing courses on the REST API
+// used for storing Trip on the REST API
 var trips map[string]tripInfo
 var latestid map[string]id
 var tripDetails map[string]TripDetails
-var passID string
 
+// Check if parameter key is valid
 func validKey(r *http.Request) bool {
 	v := r.URL.Query()
 	if key, ok := v["key"]; ok {
@@ -54,18 +55,21 @@ func validKey(r *http.Request) bool {
 	}
 }
 
+// Get Latest ID
 func getLatest(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	if r.Method == "GET" {
+		// GET Latest Trip ID
 		id := TripDB.GetLatestID()
 		strVar := id
+		// Atoi convert string to int
 		intVar, err := strconv.Atoi(strVar)
 		// handle error
 		if err != nil {
 			panic(err.Error())
 		}
 
-		// Backend calls PUT Request to insert latestID
+		// Backend calls PUT Request to insert latestID, increase latest by 1
 		jsonData := map[string]interface{}{"LatestID": (intVar + 1)}
 		jsonValue, _ := json.Marshal(jsonData)
 		request, NRerr := http.NewRequest(http.MethodPut,
@@ -119,13 +123,37 @@ func getLatest(w http.ResponseWriter, r *http.Request) {
 				w.Write([]byte("201 - Latest TripID added: " +
 					params["latestid"] + "\n"))
 			} else {
-				// update course
+				// update Trip
 				latestid[params["latestid"]] = newTripID
 				w.WriteHeader(http.StatusAccepted)
 				w.Write([]byte("202 - Trip updated: " +
 					params["tripid"] + "\n"))
 			}
 		}
+	}
+}
+
+// Get All Trip Records
+func CallGetAll() {
+	tripArray := TripDB.GetRecords()
+	jsonValue, _ := json.Marshal(tripArray)
+	request, NRerr := http.NewRequest(http.MethodPut,
+		"http://localhost:1002/api/v1/trips?key=2c78afaf-97da-4816-bbee-9ad239abb296&getall=true", bytes.NewBuffer(jsonValue))
+
+	if NRerr != nil {
+		fmt.Printf("New request failed with error %s\n", NRerr)
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		fmt.Printf("The HTTP request failed with error %s\n", err)
+	} else {
+		data, _ := ioutil.ReadAll(response.Body)
+		fmt.Println(string(data))
+		response.Body.Close()
 	}
 }
 
@@ -136,19 +164,15 @@ func allTrips(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v := r.URL.Query()
-
-	if filter_by, ok := v["filter_by"]; ok {
-		if filter_by[0] == "latest" {
-			getLatest(w, r)
-		} else if filter_by[0] == "pending" {
-			getPendingTrips(w, r)
-		} else if filter_by[0] == "nric" {
+	// Normal Call with Parameter Key only, Calls for Get All trip records
+	if len(v) == 1 {
+		CallGetAll()
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "    ")
+		enc.Encode(trips)
+	} else if getall, ok := v["getall"]; ok {
+		if getall[0] == "true" {
 			var newTripDetail []tripInfo
-			if !validKey(r) {
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte("401 - Invalid key\n"))
-				return
-			}
 
 			reqBody, err := ioutil.ReadAll(r.Body)
 
@@ -159,24 +183,35 @@ func allTrips(w http.ResponseWriter, r *http.Request) {
 			}
 			var id []string
 			for i, v := range newTripDetail {
-				if passID == strconv.Itoa(v.PassengerID) {
-					id = append(id, strconv.Itoa(v.TripID))
-					trips[id[i]] = newTripDetail[i]
-				}
+				id = append(id, strconv.Itoa(v.TripID))
+				trips[id[i]] = newTripDetail[i]
 			}
 			w.WriteHeader(http.StatusAccepted)
-			w.Write([]byte("201 - Trip Added: \n"))
+		}
+	} else if filter_by, ok := v["filter_by"]; ok {
+		if filter_by[0] == "latest" {
+			getLatest(w, r)
+		} else if filter_by[0] == "pending" {
+			if driver_id, ok := v["driver_id"]; ok {
+				getPendingTrips(w, r, driver_id[0])
+			}
+		} else if filter_by[0] == "id" {
+			if passenger_id, ok := v["passenger_id"]; ok {
+				getTripHistory(w, r, passenger_id[0])
+			}
 		}
 	}
 }
 
-func getPendingTrips(w http.ResponseWriter, r *http.Request) {
+// Driver Getting pending Trips that system has assigned to them
+func getPendingTrips(w http.ResponseWriter, r *http.Request, DID string) {
 	var newTripDetail []TripDetails
 	if r.Method == "GET" {
-		tripArray := TripDB.GetPendingRecords()
+		intDID, _ := strconv.Atoi(DID)
+		tripArray := TripDB.GetPendingRecords(intDID)
 		jsonValue, _ := json.Marshal(tripArray)
 		request, NRerr := http.NewRequest(http.MethodPut,
-			"http://localhost:1002/api/v1/trips?key=2c78afaf-97da-4816-bbee-9ad239abb296&filter_by=pending", bytes.NewBuffer(jsonValue))
+			"http://localhost:1002/api/v1/trips?key=2c78afaf-97da-4816-bbee-9ad239abb296&filter_by=pending&driver_id="+DID, bytes.NewBuffer(jsonValue))
 
 		if NRerr != nil {
 			fmt.Printf("New request failed with error %s\n", NRerr)
@@ -198,41 +233,41 @@ func getPendingTrips(w http.ResponseWriter, r *http.Request) {
 		enc.Encode(tripDetails)
 
 	}
-	if r.Header.Get("Content-type") == "application/json" {
-		if r.Method == "PUT" {
-			if !validKey(r) {
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte("401 - Invalid key\n"))
-				return
-			}
-
-			reqBody, err := ioutil.ReadAll(r.Body)
-
-			if err == nil {
-				json.Unmarshal(reqBody, &newTripDetail)
-			} else {
-				fmt.Print(err, "ERROR")
-			}
-			var id []string
-			for i, v := range newTripDetail {
-				id = append(id, strconv.Itoa(v.TripID))
-				tripDetails[id[i]] = newTripDetail[i]
-			}
-			w.WriteHeader(http.StatusAccepted)
-			w.Write([]byte("201 - Pending Trip Added: \n"))
+	if r.Method == "PUT" {
+		if !validKey(r) {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte("401 - Invalid key\n"))
+			return
 		}
+
+		reqBody, err := ioutil.ReadAll(r.Body)
+		if err == nil {
+			json.Unmarshal(reqBody, &newTripDetail)
+		} else {
+			fmt.Print(err, "ERROR")
+		}
+		var id []string
+		for i, v := range newTripDetail {
+			id = append(id, strconv.Itoa(v.TripID))
+			tripDetails[id[i]] = newTripDetail[i]
+		}
+		w.WriteHeader(http.StatusAccepted)
+		w.Write([]byte("201 - Successfully GET Pending Trip\n"))
+		return
 	}
+
 }
 
-func getTripHistory(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	passID = params["tripid"]
-	if r.Method == "GET" {
+// Passenger Calling to get Trip History
+func getTripHistory(w http.ResponseWriter, r *http.Request, PID string) {
+	var newTripDetail []tripInfo
 
-		tripArray := TripDB.GetRecords()
+	if r.Method == "GET" {
+		intPID, _ := strconv.Atoi(PID)
+		tripArray := TripDB.GetTripHistory(intPID)
 		jsonValue, _ := json.Marshal(tripArray)
 		request, NRerr := http.NewRequest(http.MethodPut,
-			"http://localhost:1002/api/v1/trips?key=2c78afaf-97da-4816-bbee-9ad239abb296&filter_by=nric", bytes.NewBuffer(jsonValue))
+			"http://localhost:1002/api/v1/trips?key=2c78afaf-97da-4816-bbee-9ad239abb296&filter_by=id&passenger_id="+PID, bytes.NewBuffer(jsonValue))
 
 		if NRerr != nil {
 			fmt.Printf("New request failed with error %s\n", NRerr)
@@ -254,129 +289,132 @@ func getTripHistory(w http.ResponseWriter, r *http.Request) {
 		enc.Encode(trips)
 
 	}
+	if r.Method == "PUT" {
+		if !validKey(r) {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte("401 - Invalid key\n"))
+			return
+		}
+
+		reqBody, err := ioutil.ReadAll(r.Body)
+		if err == nil {
+			json.Unmarshal(reqBody, &newTripDetail)
+		} else {
+			fmt.Print(err, "ERROR")
+		}
+		var id []string
+		for i, v := range newTripDetail {
+			id = append(id, strconv.Itoa(v.PassengerID))
+			trips[id[i]] = newTripDetail[i]
+		}
+		w.WriteHeader(http.StatusAccepted)
+		w.Write([]byte("201 - Successfully GET Trip History\n"))
+	}
+
 }
 
+// Specific Trip
 func trip(w http.ResponseWriter, r *http.Request) {
 	if !validKey(r) {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("401 - Invalid key\n"))
 		return
 	}
-
+	// Get url params
+	v := r.URL.Query()
+	// Get Parameters
 	params := mux.Vars(r)
-
+	// Get Specific Trip
 	if r.Method == "GET" {
-		getTripHistory(w, r)
-	}
-
-	if r.Method == "DELETE" {
 		if _, ok := trips[params["tripid"]]; ok {
-			delete(trips, params["tripid"])
-			w.WriteHeader(http.StatusAccepted)
-			w.Write([]byte("202 - Trip deleted: " +
-				params["tripid"] + "\n"))
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte("404 - No Trip found" + "\n"))
+			json.NewEncoder(w).Encode(
+				trips[params["tripid"]])
+		} else { // Scenario where GetAll Trips wasnt called before
+			CallGetAll()
+			if _, ok := trips[params["tripid"]]; ok {
+				json.NewEncoder(w).Encode(
+					trips[params["tripid"]])
+			} else { //Really No Trip found
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte("404 - No trip found"))
+				return
+			}
 		}
 	}
 
 	if r.Header.Get("Content-type") == "application/json" {
 
-		// POST is for creating new Driver
+		// POST is for creating new Trip
 		if r.Method == "POST" {
 
 			// read the string sent to the service
 			var newTrip tripInfo
 			reqBody, err := ioutil.ReadAll(r.Body)
-
 			if err == nil {
 				// convert JSON to object
 				json.Unmarshal(reqBody, &newTrip)
-
 				if newTrip.TripID == 0 &&
 					newTrip.DropOffPostalCode == 0 &&
 					newTrip.PickUpPostalCode == 0 {
 
-					w.WriteHeader(
-						http.StatusUnprocessableEntity)
-					w.Write([]byte(
-						"422 - Please supply passenger " +
-							"information " + "in JSON format" + "\n"))
-					return
+					w.WriteHeader(http.StatusUnprocessableEntity)
 				}
 
-				// check if driver exists; add only if driver does not exist
+				// check if Trip exists; add only if Trip does not exist
 				if _, ok := trips[params["tripid"]]; !ok {
 					trips[params["tripid"]] = newTrip
 					w.WriteHeader(http.StatusCreated)
 					AddTripToDB(newTrip)
 					w.Write([]byte("201 - Trip added: " +
-						params["tripid"] + "\n"))
+						params["tripid"]))
 				} else {
 					w.WriteHeader(http.StatusConflict)
 					w.Write([]byte(
 						"409 - Duplicate Trip ID" + "\n"))
 				}
 
-			} else {
-				w.WriteHeader(
-					http.StatusUnprocessableEntity)
-				w.Write([]byte("422 - Please supply trip information " +
-					"in JSON format" + "\n"))
 			}
 		}
 
 		//---PUT is for creating or updating
-		// existing driver---
+		// existing Trip---
 		if r.Method == "PUT" {
 			var newTrip tripInfo
 			reqBody, err := ioutil.ReadAll(r.Body)
 
 			if err == nil {
 				json.Unmarshal(reqBody, &newTrip)
-				fmt.Print(newTrip)
-				if newTrip.DriverID == 0 {
+				if newTrip.TripID == 0 {
 					w.WriteHeader(
 						http.StatusUnprocessableEntity)
 					w.Write([]byte(
-						"422 - Please supply trip " +
+						"422 - Please supply Trip " +
 							"information " +
 							"in JSON format" + "\n"))
 					return
 				}
-
-				// check if course exists; add only if
-				// course does not exist
-				if _, ok := trips[params["tripid"]]; !ok {
-					trips[params["tripid"]] =
-						newTrip
-					w.WriteHeader(http.StatusCreated)
-					AddTripToDB(newTrip)
-					w.Write([]byte("201 - Trip added: " +
-						params["tripid"] + "\n"))
-				} else {
-					// update course
-					trips[params["tripid"]] = newTrip
-					fmt.Print("HELLLLO\n")
-					UpdateTripToDB(newTrip)
-					w.WriteHeader(http.StatusAccepted)
-					w.Write([]byte("202 - Trip updated: " +
-						params["tripid"] + "\n"))
+				// Update Trip
+				// Check if there is initiate params
+				if initiate, ok := v["initiate"]; ok {
+					// if initiate is start
+					if initiate[0] == "start" {
+						StartTripToDB(newTrip)
+						w.WriteHeader(http.StatusAccepted)
+					} else if initiate[0] == "end" { // if initiate is End
+						EndTripToDB(newTrip)
+						w.WriteHeader(http.StatusAccepted)
+					} else {
+						fmt.Print("It should not reach here")
+					}
 				}
-			} else {
-				w.WriteHeader(
-					http.StatusUnprocessableEntity)
-				w.Write([]byte("422 - Please supply " +
-					"Trip information " +
-					"in JSON format" + "\n"))
+
 			}
 		}
 	}
 }
 
 // DB Functions
-type Trip struct { // map this type to the record in the table
+type TripDetail struct { // map this type to the record in the table
 	TripID            int
 	PassengerID       int
 	DriverID          int
@@ -388,7 +426,7 @@ type Trip struct { // map this type to the record in the table
 }
 
 func AddTripToDB(tripInfo tripInfo) {
-	var trip Trip
+	var trip TripDetail
 	trip.TripID = tripInfo.TripID
 	trip.PassengerID = tripInfo.PassengerID
 	trip.PickUpPostalCode = tripInfo.PickUpPostalCode
@@ -396,26 +434,28 @@ func AddTripToDB(tripInfo tripInfo) {
 	trip.Status = tripInfo.Status
 	TripDB.TripDB("Insert", TripDB.Trip(trip))
 }
-func UpdateTripToDB(tripInfo tripInfo) {
-	fmt.Print("HEY")
-	var trip Trip
-	trip.PassengerID = 28
+
+func StartTripToDB(tripInfo tripInfo) {
+	var trip TripDetail
 	trip.TripID = tripInfo.TripID
-	trip.DriverID = tripInfo.DriverID
 	trip.TripStartTime = tripInfo.TripStartTime
-	trip.TripEndTime = tripInfo.TripEndTime
 	trip.Status = tripInfo.Status
-	if tripInfo.DriverID == 0 {
-		fmt.Print("ASDASD")
-		TripDB.TripDB("Start", TripDB.Trip(trip))
-	} else {
-		TripDB.TripDB("End", TripDB.Trip(trip))
-	}
+	fmt.Print("FMT", trip)
+	TripDB.TripDB("Start", TripDB.Trip(trip))
 
 }
-func main() {
 
-	// instantiate courses
+func EndTripToDB(tripInfo tripInfo) {
+	var trip TripDetail
+	trip.TripID = tripInfo.TripID
+	trip.TripEndTime = tripInfo.TripEndTime
+	trip.Status = tripInfo.Status
+	fmt.Print("FMT", trip)
+	TripDB.TripDB("End", TripDB.Trip(trip))
+}
+
+func main() {
+	// instantiate trips, latetid and tripDetails
 	trips = make(map[string]tripInfo)
 	latestid = make(map[string]id)
 	tripDetails = make(map[string]TripDetails)

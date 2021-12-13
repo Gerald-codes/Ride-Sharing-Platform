@@ -38,13 +38,23 @@ func UpdatePassenger(db *sql.DB, FN string, LN string, MN int, EA string, ID int
 	}
 }
 
-func GetRecords(db *sql.DB) {
+func GetRecords() (res []Passenger) {
+	db, Qerr := sql.Open("mysql", "user:password@tcp(127.0.0.1:3306)/ride_sharing")
+
+	// handle error
+	if Qerr != nil {
+		panic(Qerr.Error())
+	}
+
+	// defer the close till after the main function has finished executing
+	defer db.Close()
 	results, err := db.Query("Select * FROM ride_sharing.Passengers")
 
 	if err != nil {
 		panic(err.Error())
 	}
 
+	var PassengerRecords []Passenger
 	for results.Next() {
 		// map this type to the record in the table
 		var passenger Passenger
@@ -53,9 +63,9 @@ func GetRecords(db *sql.DB) {
 		if err != nil {
 			panic(err.Error())
 		}
-		fmt.Println(passenger.PassengerID, passenger.FirstName,
-			passenger.LastName, passenger.MobileNo, passenger.EmailAddress)
+		PassengerRecords = append(PassengerRecords, passenger)
 	}
+	return PassengerRecords
 }
 
 func GetLatestID() (res string) {
@@ -69,7 +79,7 @@ func GetLatestID() (res string) {
 	// defer the close till after the main function has finished executing
 	defer db.Close()
 
-	results, err := db.Query("SELECT MAX(PassengerID) FROM ride_sharing.Passengers")
+	results, err := db.Query("SELECT COALESCE(MAX(PassengerID),0) FROM ride_sharing.Passengers")
 
 	if err != nil {
 		panic(err.Error())
@@ -103,8 +113,6 @@ func PassengerDB(method string, p Passenger) {
 		UpdatePassenger(db, p.FirstName, p.LastName, p.MobileNo, p.EmailAddress, p.PassengerID)
 		fmt.Println("Updated ", p.FirstName, " Database")
 	}
-
-	GetRecords(db)
 
 	// defer the close till after the main function has finished executing
 	defer db.Close()
