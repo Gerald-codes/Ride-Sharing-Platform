@@ -16,11 +16,11 @@ For BackEnd, It can cater to both mobile and desktop as both devices can connect
 ![image](https://user-images.githubusercontent.com/77374003/145786170-c4d719d5-a1e5-461c-b4b8-08f49acd1071.png)
 
 
-FrontEnd will call APIs to send and retrieve data from BackEnd through respectives ports (Driver - 1000, Passenger - 1001 & Trip - 1002).
+FrontEnd will send and retrieve data through API calls as BackEnd listens through respectives ports (Driver - 1000, Passenger - 1001 & Trip - 1002).
 
-When FrontEnd calls the Api, BackEnd will run functions that will either retreive, insert or update information from and in the database.
+Based on the API calls from FrontEnd, BackEnd will run functions that will either retreive, insert or update information in the database. 
 
-For Database, its supposed to be inseparate Database connections, but for this assignment, it will be in the same database but different table.
+For Database, its supposed to be in separate Database connections, but for this assignment, it will be in the same database but different table.
 
 Note: BackEnd wont have connection with another Backend, Some functions will have return values hence there is 2 different arrows.
 
